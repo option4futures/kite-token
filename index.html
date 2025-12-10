@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head><title>Kite Login</title></head>
+<body>
+  <h2>Click below to login to Zerodha</h2>
+  <a href="https://kite.zerodha.com/connect/login?v=3&api_key=YOUR_API_KEY_HERE">
+    <button style="padding:15px;font-size:18px">Login with Zerodha</button>
+  </a>
+  <hr>
+  <pre id="output"></pre>
+  <script>
+    // Auto-copy request_token when redirected back
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('request_token');
+    if (token) {
+      document.getElementById('output').textContent = 
+        "REQUEST TOKEN (copied to clipboard):\n" + token;
+      navigator.clipboard.writeText(token);
+      
+      // Auto generate access token
+      const api_key = "YOUR_API_KEY_HERE";
+      const api_secret = "YOUR_API_SECRET_HERE";  // Keep this private!
+      const checksum = api_key + token + api_secret;
+      
+      // Simple SHA256 in browser (no external lib)
+      async function sha256(str) {
+        const msgBuffer = new TextEncoder().encode(str);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+      
+      sha256(checksum).then(hex => {
+        const url = `https://api.kite.trade/session/token`;
+        fetch(`https://api.kite.trade/session/token`, {
+          method: 'POST',
+          headers: {
+            'X-Kite-Version': '3',
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            api_key: api_key,
+            request_token: token,
+            checksum: hex
+          })
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.data && data.data.access_token) {
+            const result = `ACCESS TOKEN (copied!):\n${data.data.access_token}`;
+            document.getElementById('output').textContent += "\n\n" + result;
+            navigator.clipboard.writeText(data.data.access_token);
+            alert("Access token copied to clipboard!");
+          } else {
+            document.getElementById('output').textContent += "\nError: " + JSON.stringify(data);
+          }
+        });
+      });
+    }
+  </script>
+</body>
+</html>
